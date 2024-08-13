@@ -31,19 +31,35 @@ public class PackageInfo
 
     public string? DetectionScript { get; set; }
 
-    internal WingetInstaller? GetBestFit(Architecture architecture, InstallerContext context)
+    internal WingetInstaller? GetBestFit(Architecture architecture, InstallerContext context, string? locale = null)
     {
         if (Installers is null) { return null; }
-        return Installers.SingleOrDefault(Models.InstallerType.Msi, architecture, context)
-            ?? Installers.SingleOrDefault(Models.InstallerType.Msi, architecture, Models.InstallerContext.Unknown)
-            ?? Installers.SingleOrDefault(Models.InstallerType.Wix, architecture, context)
-            ?? Installers.SingleOrDefault(Models.InstallerType.Wix, architecture, Models.InstallerContext.Unknown)
-            ?? Installers.SingleOrDefault(Models.InstallerType.Unknown, architecture, context)
-            ?? Installers.SingleOrDefault(Models.InstallerType.Unknown, architecture, Models.InstallerContext.Unknown)
+        return Installers.SingleOrDefault(Models.InstallerType.Msi, architecture, context, locale)
+            ?? Installers.SingleOrDefault(Models.InstallerType.Msi, architecture, Models.InstallerContext.Unknown, locale)
+            ?? Installers.SingleOrDefault(Models.InstallerType.Wix, architecture, context, locale)
+            ?? Installers.SingleOrDefault(Models.InstallerType.Wix, architecture, Models.InstallerContext.Unknown, locale)
+            ?? Installers.SingleOrDefault(Models.InstallerType.Unknown, architecture, context, locale)
+            ?? Installers.SingleOrDefault(Models.InstallerType.Unknown, architecture, Models.InstallerContext.Unknown, locale)
             ;
     }
 
-    internal bool InstallersLoaded => Installers?.Any() == true;
+    internal WingetInstaller? GetBestInstaller(PackageOptions packageOptions)
+    {
+        if (Installers is null) { return null; }
+        var installer = GetBestFit(packageOptions.Architecture, packageOptions.InstallerContext, packageOptions.Locale)
+            ?? GetBestFit(Models.Architecture.Neutral, Models.InstallerContext.Unknown, packageOptions.Locale)
+            ?? GetBestFit(Models.Architecture.Neutral, packageOptions.InstallerContext, packageOptions.Locale)
+            ?? GetBestFit(packageOptions.Architecture, Models.InstallerContext.Unknown, packageOptions.Locale);
+        // if the installer is still null and we are not explicitly looking for arm64 or x64, try x86
+        if (installer == null && packageOptions.Architecture != WingetIntune.Models.Architecture.X64 && packageOptions.Architecture != Models.Architecture.Arm64)
+        {
+            installer = GetBestFit(Models.Architecture.X86, packageOptions.InstallerContext)
+                ?? GetBestFit(Models.Architecture.X86, Models.InstallerContext.Unknown);
+        }
+        return installer;
+    }
+
+    internal bool InstallersLoaded => Installers?.Count > 0 == true;
 
     public static PackageInfo Parse(string wingetOutput)
     {

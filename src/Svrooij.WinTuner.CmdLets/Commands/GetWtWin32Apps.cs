@@ -48,7 +48,7 @@ public class GetWtWin32Apps : BaseIntuneCmdlet
     private ILogger<GetWtWin32Apps>? logger;
 
     [ServiceDependency]
-    private HttpClient? httpClient;
+    private WingetIntune.Graph.GraphClientFactory? gcf;
 
     [ServiceDependency]
     private Winget.CommunityRepository.WingetRepository? repo;
@@ -59,7 +59,7 @@ public class GetWtWin32Apps : BaseIntuneCmdlet
         ValidateAuthenticationParameters();
         logger?.LogInformation("Getting list of published apps");
 
-        var graphServiceClient = CreateGraphServiceClient(httpClient!);
+        var graphServiceClient = gcf!.CreateClient(CreateAuthenticationProvider(cancellationToken: cancellationToken));
         var apps = await graphServiceClient.DeviceAppManagement.MobileApps.GetWinTunerAppsAsync(cancellationToken);
 
         List<Models.WtWin32App> result = new();
@@ -75,6 +75,8 @@ public class GetWtWin32Apps : BaseIntuneCmdlet
                 CurrentVersion = app.CurrentVersion,
                 SupersededAppCount = app.SupersededAppCount,
                 SupersedingAppCount = app.SupersedingAppCount,
+                InstallerContext = app.InstallerContext,
+                Architecture = app.Architecture,
                 LatestVersion = version,
             });
         }
@@ -94,6 +96,9 @@ public class GetWtWin32Apps : BaseIntuneCmdlet
             result = Superseding.Value ? result.Where(x => x.SupersededAppCount > 0).ToList() : result.Where(x => x.SupersededAppCount == 0).ToList();
         }
 
-        WriteObject(result);
+        foreach (var item in result)
+        {
+            WriteObject(item);
+        }
     }
 }

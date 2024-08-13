@@ -1,12 +1,17 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Kiota.Http.HttpClientLibrary;
 using WingetIntune.Interfaces;
 using WingetIntune.Intune;
-
+using WingetIntune.Testing;
+using WinTuner.Proxy.Client;
+[assembly: InternalsVisibleTo("WingetIntune.Tests")]
 namespace WingetIntune;
 
 public static class WingetServiceCollectionExtension
 {
-    public static IServiceCollection AddWingetServices(this IServiceCollection services)
+    public const string DefaultProxyCode = "*REPLACED_AT_BUILD*";
+    public static IServiceCollection AddWingetServices(this IServiceCollection services, string? proxyCode = null)
     {
         services.ConfigureHttpClientDefaults(config =>
         {
@@ -19,6 +24,13 @@ public static class WingetServiceCollectionExtension
                 client.MaxResponseContentBufferSize = 1024L * 1024 * 50;
             });
         });
+
+        services.AddKiotaHandlers();
+        services.AddHttpClient<Graph.GraphClientFactory>((sp, client) =>
+        {
+            client.BaseAddress = new Uri("https://graph.microsoft.com/beta");
+        }).AttachKiotaHandlers();
+
         services.AddTransient<IFileManager, Os.DefaultFileManager>();
         services.AddTransient<IProcessManager, Os.ProcessManager>();
         services.AddTransient<IWingetRepository, Implementations.WingetManager>();
@@ -40,10 +52,55 @@ public static class WingetServiceCollectionExtension
         services.AddTransient<IAzureFileUploader, Implementations.ChunkedAzureFileUploader>();
         services.AddTransient<Intune.MetadataManager>();
         services.AddTransient<Graph.GraphAppUploader>();
+        services.AddTransient<Graph.GraphStoreAppUploader>();
         services.AddSingleton<Internal.Msal.PublicClientAuth>();
-        services.AddTransient<Internal.MsStore.MicrosoftStoreClient>();
         services.AddSingleton<IntuneManager>();
+        services.AddTransient<WindowsSandbox>();
+
+        services.AddWinTunerProxyClient(config =>
+        {
+            var codeFromEnv = Environment.GetEnvironmentVariable("WINTUNER_PROXY_CODE");
+            if (!string.IsNullOrEmpty(codeFromEnv))
+            {
+                config.Code = codeFromEnv;
+            }
+            else if (!string.IsNullOrEmpty(proxyCode) && proxyCode != DefaultProxyCode)
+            {
+                config.Code = proxyCode;
+            }
+            var proxyUrl = Environment.GetEnvironmentVariable("WINTUNER_PROXY_URL");
+            if (!string.IsNullOrEmpty(proxyUrl))
+            {
+                config.BaseAddress = new Uri(proxyUrl);
+            }
+        });
 
         return services;
+    }
+
+    private static IServiceCollection AddKiotaHandlers(this IServiceCollection services)
+    {
+        // Dynamically load the Kiota handlers from the Client Factory
+        var kiotaHandlers = KiotaClientFactory.GetDefaultHandlerTypes();
+        // And register them in the DI container
+        foreach (var handler in kiotaHandlers)
+        {
+            services.AddTransient(handler);
+        }
+
+        return services;
+    }
+
+    private static IHttpClientBuilder AttachKiotaHandlers(this IHttpClientBuilder builder)
+    {
+        // Dynamically load the Kiota handlers from the Client Factory
+        var kiotaHandlers = KiotaClientFactory.GetDefaultHandlerTypes();
+        // And attach them to the http client builder
+        foreach (var handler in kiotaHandlers)
+        {
+            builder.AddHttpMessageHandler((sp) => (DelegatingHandler)sp.GetRequiredService(handler));
+        }
+
+        return builder;
     }
 }

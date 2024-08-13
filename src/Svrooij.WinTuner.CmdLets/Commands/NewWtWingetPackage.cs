@@ -34,7 +34,7 @@ public class NewWtWingetPackage : DependencyCmdlet<Startup>
     /// The folder to store the package in
     /// </summary>
     [Parameter(
-        Mandatory = false,
+        Mandatory = true,
         Position = 1,
         ValueFromPipeline = true,
         ValueFromPipelineByPropertyName = true,
@@ -62,6 +62,61 @@ public class NewWtWingetPackage : DependencyCmdlet<Startup>
         ValueFromPipelineByPropertyName = true,
         HelpMessage = "The folder to store temporary files in")]
     public string? TempFolder { get; set; } = Path.Combine(Path.GetTempPath(), "wintuner");
+
+    /// <summary>
+    /// Pick this architecture
+    /// </summary>
+    [Parameter(
+        Mandatory = false,
+        Position = 4,
+        ValueFromPipeline = true,
+        ValueFromPipelineByPropertyName = true,
+        HelpMessage = "Pick this architecture")]
+    public WingetIntune.Models.Architecture Architecture { get; set; } = WingetIntune.Models.Architecture.Unknown;
+
+    /// <summary>
+    /// The installer context
+    /// </summary>
+    [Parameter(
+        Mandatory = false,
+        Position = 5,
+        ValueFromPipeline = true,
+        ValueFromPipelineByPropertyName = true,
+        HelpMessage = "The installer context")]
+    public WingetIntune.Models.InstallerContext InstallerContext { get; set; } = WingetIntune.Models.InstallerContext.System;
+
+    /// <summary>
+    /// Package as script
+    /// </summary>
+    [Parameter(
+        Mandatory = false,
+        Position = 6,
+        ValueFromPipeline = true,
+        ValueFromPipelineByPropertyName = true,
+        HelpMessage = "Package WinGet script, instead of the actual installer. Helpful for installers that don't really work with WinTuner.")]
+    public bool? PackageScript { get; set; }
+
+    /// <summary>
+    /// Desired locale
+    /// </summary>
+    [Parameter(
+        Mandatory = false,
+        Position = 7,
+        ValueFromPipeline = true,
+        ValueFromPipelineByPropertyName = true,
+        HelpMessage = "The desired locale, if available (eg. 'en-US')")]
+    public string? Locale { get; set; }
+
+    /// <summary>
+    /// Override the installer arguments
+    /// </summary>
+    [Parameter(
+        Mandatory = false,
+        Position = 8,
+        ValueFromPipeline = false,
+        ValueFromPipelineByPropertyName = false,
+        HelpMessage = "Override the installer arguments")]
+    public string? InstallerArguments { get; set; }
 
     [ServiceDependency]
     private ILogger<NewWtWingetPackage> logger;
@@ -102,6 +157,14 @@ public class NewWtWingetPackage : DependencyCmdlet<Startup>
                 TempFolder!,
                 PackageFolder,
                 packageInfo,
+                new WingetIntune.Models.PackageOptions
+                {
+                    Architecture = Architecture,
+                    InstallerContext = InstallerContext,
+                    PackageScript = PackageScript ?? false,
+                    Locale = Locale,
+                    OverrideArguments = InstallerArguments
+                },
                 cancellationToken: cancellationToken);
 
             WriteObject(package);

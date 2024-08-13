@@ -12,8 +12,17 @@ on:
   workflow_dispatch:
 
 jobs:
+  api:
+    name: 💤 Wake api
+    runs-on: ubuntu-latest
+    steps:
+      - name: ✅ Load OpenAPI specs
+        shell: pwsh
+        run: |
+          $homepage = iwr -Uri https://proxy.wintuner.app
+          $specs = Iwr -Uri https://proxy.wintuner.app/api/swagger.json
   test:
-    name: 🛠️ Build and Test
+    name: 🛠️ Build and Test C#
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,7 +49,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget
 
-      - name: 🎒 Load packages
+      - name: 🎒 Install Kiota
+        run: dotnet tool install --global Microsoft.OpenApi.Kiota
+
+      - name: 🎒 Load packages (and generate api client)
         run: dotnet restore
 
       - name: 🛠️ Build code
@@ -51,8 +63,8 @@ jobs:
 
       - name: 📝 Code Coverage report
         run: |
-          dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.1.23
-          reportgenerator -reports:${{github.workspace}}/coverage.cobertura.xml -targetdir:${{github.workspace}}/report -reporttypes:MarkdownSummaryGithub -filefilters:-*.g.cs "-classfilters:-WixSharp.*;-WingetIntune.Os.*;-WingetIntune.Internal.MsStore.*" -verbosity:Warning
+          dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.2.5
+          reportgenerator -reports:${{github.workspace}}/coverage.cobertura.xml -targetdir:${{github.workspace}}/report -reporttypes:MarkdownSummaryGithub -filefilters:-*.g.cs "-classfilters:-WixSharp.*;-WingetIntune.Os.*;-WingetIntune.Internal.MsStore.Models.*" -verbosity:Warning
           sed -i 's/# Summary/## 📝 Code Coverage/g' ${{github.workspace}}/report/SummaryGithub.md
           sed -i 's/## Coverage/### 📝 Code Coverage details/g' ${{github.workspace}}/report/SummaryGithub.md
           cat ${{github.workspace}}/report/*.md >> $GITHUB_STEP_SUMMARY
@@ -61,11 +73,93 @@ jobs:
         if: always()
         run: dotnet format --verify-no-changes
 
+  testps:
+    name: 🛠️ Build and Test PowerShell
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      checks: write
+      pull-requests: write
+    steps:
+      - name: 👨‍💻 Check-out code
+        uses: actions/checkout@v4
+
+      - name: 👨‍🔧 Setup .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+
+      - name: 🔍 Enable problem matchers
+        run: echo "::add-matcher::.github/matchers/dotnet.json"
+
+      - name: 🦸‍♂️ Restore steriods
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          # Look to see if there is a cache hit for the corresponding requirements file
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget
+
+      - name: 🎒 Install Kiota
+        run: dotnet tool install --global Microsoft.OpenApi.Kiota
+
+      - name: 🎒 Load packages (and generate api client)
+        run: dotnet restore
+
+      - name: 🛠️ Build module
+        shell: pwsh
+        run:
+          dotnet build ./src/Svrooij.WinTuner.CmdLets/Svrooij.WinTuner.CmdLets.csproj --configuration Release --no-restore -p:Version="0.0.1-dev" -o ./dist/WinTuner
+      
+      - name: 📦 Install Pester
+        shell: pwsh
+        run: Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser
+      
+      - name: 🕵️ Import module and list commands
+        shell: pwsh
+        run: |
+          Import-Module ./dist/WinTuner/WinTuner.psd1
+          Get-Command -Module WinTuner
+      
+      - name: 🧪 Run test
+        shell: pwsh
+        run: |
+          Import-Module Pester
+          Import-Module ./dist/WinTuner/WinTuner.psd1
+          $pesterConfig = [PesterConfiguration]@{
+            Output = @{
+              Verbosity = "Normal"
+              CIFormat = "Auto"
+              StackTraceVerbosity = "FirstLine"
+            }
+            TestResult = @{
+              Enabled = $true
+              OutputPath = "${{ github.workspace }}/testresults/TestResults.xml"
+              OutputFormat = "JUnitXml"
+            }
+            Run = @{
+              Path = "./tests/WinTuner.Cmdlets.Tests"
+              Exit = $true
+            }
+            Should = @{
+              ErrorAction = "Continue"
+            }
+          }
+          Invoke-Pester -Configuration $pesterConfig
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: ${{ github.workspace }}/testresults/*.xml
+
   publish-nuget:
     name: 📦 Publish WinTuner to nuget
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [test]
+    needs: [test, testps]
     steps:
     - name: 👨‍💻 Check-out code
       uses: actions/checkout@v4
@@ -89,7 +183,10 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget
 
-    - name: 🎒 Load packages
+    - name: 🎒 Install Kiota
+      run: dotnet tool install --global Microsoft.OpenApi.Kiota
+
+    - name: 🎒 Load packages (and generate api client)
       run: dotnet restore
 
     - name: 🛠️ Build code
@@ -109,7 +206,7 @@ jobs:
     name: 📦 Publish WinTuner to PowerShell Gallery
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [test]
+    needs: [test, testps]
     steps:
     - name: 👨‍💻 Check-out code
       uses: actions/checkout@v4
@@ -133,7 +230,10 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget
 
-    - name: 🎒 Load packages
+    - name: 🎒 Install Kiota
+      run: dotnet tool install --global Microsoft.OpenApi.Kiota
+
+    - name: 🎒 Load packages (and generate api client)
       run: dotnet restore
 
     - name: 📝 Set module version
@@ -144,17 +244,22 @@ jobs:
         $module = Get-Content -Path src/Svrooij.WinTuner.CmdLets/WinTuner.psd1
         $module = $module -replace 'ModuleVersion = ''\d+\.\d+\.\d+''', "ModuleVersion = '$version'"
         $module | Set-Content -Path src/Svrooij.WinTuner.CmdLets/WinTuner.psd1
+        $startupContent = Get-Content -Path src/Svrooij.WinTuner.CmdLets/Startup.cs
+        $startupContent = $startupContent -replace '\*REPLACED_AT_BUILD\*', $env:WINTUNER_PROXY_TOKEN
+        $startupContent | Set-Content -Path src/Svrooij.WinTuner.CmdLets/Startup.cs
+
+      env:
+        WINTUNER_PROXY_TOKEN: ${{ secrets.WINTUNER_PROXY_TOKEN }}
 
     - name: 🛠️ Build module
       shell: pwsh
       run: dotnet build ./src/Svrooij.WinTuner.CmdLets/Svrooij.WinTuner.CmdLets.csproj --configuration Release --no-restore -p:Version=$("${{ github.ref_name }}".Substring(1)) -o ./dist/WinTuner
     
-    - name: 🧪 Run tests (import module)
+    - name: 🧪 Import module
       shell: pwsh
       run: |
         Import-Module ./dist/WinTuner/WinTuner.psd1
         Get-Command -Module WinTuner
-        Get-Command -Module WinTuner | Select-Object -ExpandProperty Name | ForEach-Object { Get-Help -Name $_ -Full }
     
     - name: 📦 Publish WinTuner to PowerShell Gallery
       shell: pwsh

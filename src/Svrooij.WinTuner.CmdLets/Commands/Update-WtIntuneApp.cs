@@ -69,7 +69,7 @@ public class UpdateWtIntuneApp : BaseIntuneCmdlet
     private ILogger<UpdateWtIntuneApp>? logger;
 
     [ServiceDependency]
-    private HttpClient? httpClient;
+    private WingetIntune.Graph.GraphClientFactory? gcf;
 
     /// <inheritdoc/>
     public override async Task ProcessRecordAsync(CancellationToken cancellationToken)
@@ -77,12 +77,12 @@ public class UpdateWtIntuneApp : BaseIntuneCmdlet
         ValidateAuthenticationParameters();
         logger?.LogInformation("Updating app {appId} in Intune", AppId);
 
-        var graphServiceClient = CreateGraphServiceClient(httpClient!);
+        var graphServiceClient = gcf!.CreateClient(CreateAuthenticationProvider(cancellationToken: cancellationToken));
 
         if (Categories is not null && Categories.Any())
         {
             logger?.LogInformation("Adding categories to app {appId}", AppId);
-            await graphServiceClient.AddIntuneCategoriesToApp(AppId!, Categories, cancellationToken);
+            await graphServiceClient.AddIntuneCategoriesToAppAsync(AppId!, Categories, cancellationToken);
         }
 
         if ((AvailableFor is not null && AvailableFor.Any()) ||

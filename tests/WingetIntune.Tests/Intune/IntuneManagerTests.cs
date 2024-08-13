@@ -80,7 +80,7 @@ The Azure command-line interface (Azure CLI) is a set of commands used to create
 
         var intunePackager = Substitute.For<IIntunePackager>();
 
-        var intuneManager = new IntuneManager(new NullLoggerFactory(), fileManager, processManager, null, null, null, null, intunePackager, null, null);
+        var intuneManager = new IntuneManager(new NullLoggerFactory(), fileManager, processManager, null, null, null, intunePackager, null, null, null);
 
         await intuneManager.GenerateInstallerPackage(tempFolder, outputFolder, IntuneTestConstants.azureCliPackageInfo, new PackageOptions { Architecture = Models.Architecture.X64, InstallerContext = InstallerContext.User }, CancellationToken.None);
 

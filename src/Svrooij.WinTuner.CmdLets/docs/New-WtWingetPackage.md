@@ -13,8 +13,10 @@ Create intunewin file from Winget installer
 ## SYNTAX
 
 ```
-New-WtWingetPackage [-PackageId] <String> [[-PackageFolder] <String>] [[-Version] <String>]
- [[-TempFolder] <String>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
+New-WtWingetPackage [-PackageId] <String> [-PackageFolder] <String> [[-Version] <String>]
+ [[-TempFolder] <String>] [-Architecture <Architecture>] [-InstallerContext <InstallerContext>]
+ [-PackageScript <Boolean>] [-Locale <String>] [-InstallerArguments <String>]
+ [-ProgressAction <ActionPreference>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -39,7 +41,7 @@ Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: False
+Required: True
 Position: 1
 Default value: None
 Accept pipeline input: True (ByPropertyName, ByValue)
@@ -98,6 +100,81 @@ Accept wildcard characters: False
 Type: ActionPreference
 Parameter Sets: (All)
 Aliases: proga
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Architecture
+Pick this architecture
+
+```yaml
+Type: Architecture
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: True (ByPropertyName, ByValue)
+Accept wildcard characters: False
+```
+
+### -InstallerContext
+The installer context
+
+```yaml
+Type: InstallerContext
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: True (ByPropertyName, ByValue)
+Accept wildcard characters: False
+```
+
+### -PackageScript
+Package WinGet script, instead of the actual installer. Helpful for installers that don't really work with WinTuner.
+
+```yaml
+Type: Boolean
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: True (ByPropertyName, ByValue)
+Accept wildcard characters: False
+```
+
+### -Locale
+The desired locale, if available (eg. 'en-US')
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: True (ByPropertyName, ByValue)
+Accept wildcard characters: False
+```
+
+### -InstallerArguments
+Override the installer arguments
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
 
 Required: False
 Position: Named

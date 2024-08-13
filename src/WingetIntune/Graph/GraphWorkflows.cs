@@ -8,13 +8,14 @@ namespace WingetIntune.Graph;
 
 public static class GraphWorkflows
 {
-    public static async Task AddIntuneCategoriesToApp(this GraphServiceClient graphServiceClient, string appId, string[] categories, CancellationToken cancellationToken)
+    public static async Task AddIntuneCategoriesToAppAsync(this GraphServiceClient graphServiceClient, string appId, string[] categories, CancellationToken cancellationToken)
     {
+#if NET8_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(graphServiceClient);
         ArgumentException.ThrowIfNullOrEmpty(appId);
         ArgumentNullException.ThrowIfNull(categories);
         ArgumentNullException.ThrowIfNull(cancellationToken);
-
+#endif
         // Load categories to match against
         var graphCategories = await graphServiceClient.DeviceAppManagement.MobileAppCategories.GetAsync(cancellationToken: cancellationToken);
 
@@ -30,10 +31,11 @@ public static class GraphWorkflows
 
     public static async Task<int> AssignAppAsync(this GraphServiceClient graphServiceClient, string appId, string[]? requiredFor, string[]? availableFor, string[]? uninstallFor, bool addAutoUpdateSetting, CancellationToken cancellationToken)
     {
+#if NET8_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(graphServiceClient);
         ArgumentException.ThrowIfNullOrEmpty(appId);
         ArgumentNullException.ThrowIfNull(cancellationToken);
-
+#endif
         List<MobileAppAssignment> assignments = new List<MobileAppAssignment>();
         if (requiredFor is not null && requiredFor.Any())
         {
@@ -68,7 +70,8 @@ public static class GraphWorkflows
         MobileAppAssignmentSettings? settings = null;
         if (intent == InstallIntent.Available && addSetting)
         {
-            settings = new Win32LobAppAssignmentSettings { AutoUpdateSettings = new Win32LobAppAutoUpdateSettings { AutoUpdateSupersededApps = Win32LobAppAutoUpdateSupersededApps.Enabled } };
+            settings = new Win32LobAppAssignmentSettings { Notifications = Win32LobAppNotification.ShowReboot };
+            settings.AdditionalData.Add("autoUpdateSettings", new Win32LobAppAutoUpdateSettings());
         }
         if (groups is not null && groups.Any())
         {

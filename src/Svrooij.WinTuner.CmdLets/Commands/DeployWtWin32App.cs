@@ -132,18 +132,22 @@ public class DeployWtWin32App : BaseIntuneCmdlet
     private MetadataManager? metadataManager;
 
     [ServiceDependency]
-    private HttpClient? httpClient;
+    private WingetIntune.Graph.GraphClientFactory? gcf;
 
     /// <inheritdoc/>
     public override async Task ProcessRecordAsync(CancellationToken cancellationToken)
     {
+        logger?.LogDebug("Validating authentication parameters");
         ValidateAuthenticationParameters();
+        logger?.LogDebug("Authentication parameters validated");
 
         if (App is null)
         {
             if (ParameterSetName == ParameterSetWinGet)
             {
+                logger?.LogDebug("Loading package details from RootPackageFolder {RootPackageFolder}, PackageId {PackageId}, Version {Version}", RootPackageFolder, PackageId, Version);
                 PackageFolder = Path.Combine(RootPackageFolder!, PackageId!, Version!);
+                logger?.LogDebug("Loading package details from folder {packageFolder}", PackageFolder);
             }
 
             if (PackageFolder is not null)
@@ -156,7 +160,9 @@ public class DeployWtWin32App : BaseIntuneCmdlet
             }
             else
             {
-                throw new ArgumentException("No package or package id specified");
+                var ex = new ArgumentException("No App or PackageFolder was provided");
+                logger?.LogError(ex, "No App or PackageFolder was provided");
+                throw ex;
             }
         }
 
@@ -166,7 +172,7 @@ public class DeployWtWin32App : BaseIntuneCmdlet
         }
 
         logger?.LogInformation("Uploading Win32App {DisplayName} to Intune with file {IntuneWinFile}", App!.DisplayName, IntuneWinFile);
-        var graphServiceClient = CreateGraphServiceClient(httpClient!);
+        var graphServiceClient = gcf!.CreateClient(CreateAuthenticationProvider(cancellationToken: cancellationToken));
         var newApp = await graphAppUploader!.CreateNewAppAsync(graphServiceClient, App, IntuneWinFile!, LogoPath, cancellationToken);
         logger?.LogInformation("Created Win32App {DisplayName} with id {appId}", newApp!.DisplayName, newApp.Id);
 
@@ -239,7 +245,8 @@ public class DeployWtWin32App : BaseIntuneCmdlet
                 {
                     if (assignment.Intent == GraphModels.InstallIntent.Available && assignment.Settings is null)
                     {
-                        assignment.Settings = new GraphModels.Win32LobAppAssignmentSettings { AutoUpdateSettings = new GraphModels.Win32LobAppAutoUpdateSettings { AutoUpdateSupersededApps = GraphModels.Win32LobAppAutoUpdateSupersededApps.Enabled } };
+                        assignment.Settings = new GraphModels.Win32LobAppAssignmentSettings { Notifications = GraphModels.Win32LobAppNotification.ShowReboot };
+                        assignment.Settings.AdditionalData.Add("autoUpdateSettings", new Win32LobAppAutoUpdateSettings());
                     }
                 }
 
